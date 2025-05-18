@@ -10,7 +10,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "better-sqlite3": "^11.9.1",
     "dotenv": "^16.5.0",
     "hono": "^4.7.5",
     "kysely": "^0.27.6",
