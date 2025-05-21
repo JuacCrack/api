@@ -1,7 +1,6 @@
 import { db, dbname } from "../config/db";
 
 export class BaseModel {
-
   static async select(
     table: string,
     cols: string[] = ["*"],
@@ -45,45 +44,96 @@ export class BaseModel {
 
   static async structure(table: string) {
     try {
-      console.log("Structure operation started");
-      console.log("Table:", table);
-
       const columnQuery = `
-        SELECT 
-          COLUMN_NAME,
-          DATA_TYPE,
-          COLUMN_KEY,
-          IS_NULLABLE,
-          COLUMN_DEFAULT,
-          CHARACTER_MAXIMUM_LENGTH,
-          EXTRA
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
-      `;
-      console.log("Column query:", columnQuery);
+      SELECT 
+        C.COLUMN_NAME,
+        C.DATA_TYPE,
+        C.COLUMN_KEY,
+        K.REFERENCED_TABLE_NAME,
+        K.REFERENCED_COLUMN_NAME
+      FROM information_schema.COLUMNS AS C
+      LEFT JOIN information_schema.KEY_COLUMN_USAGE AS K
+        ON C.TABLE_NAME = K.TABLE_NAME
+        AND C.COLUMN_NAME = K.COLUMN_NAME
+        AND C.TABLE_SCHEMA = K.TABLE_SCHEMA
+      WHERE C.TABLE_SCHEMA = DATABASE() AND C.TABLE_NAME = ?
+      ORDER BY C.ORDINAL_POSITION
+    `;
 
-      const [columns, _] = await db.execute(columnQuery, [table]) as [Array<any>, any];
-      console.log("Columns fetched:", columns);
+      const [columns] = (await db.execute(columnQuery, [table])) as [
+        Array<any>,
+        any
+      ];
 
-      const structure = columns.map((col: any) => {
-        return {
+      const structure = [];
+
+      for (const col of columns) {
+        const isFK = !!col.REFERENCED_TABLE_NAME;
+        const fkData = isFK
+          ? await this.getForeignKeyDetails(
+              col.REFERENCED_TABLE_NAME,
+              col.REFERENCED_COLUMN_NAME
+            )
+          : null;
+
+        structure.push({
           columnName: col.COLUMN_NAME,
           dataType: col.DATA_TYPE,
-          // isNullable: col.IS_NULLABLE === "YES",
           isPrimaryKey: col.COLUMN_KEY === "PRI",
-          // isUnique: col.COLUMN_KEY === "UNI",
-          // defaultValue: col.COLUMN_DEFAULT,
-          // maxLength: col.CHARACTER_MAXIMUM_LENGTH,
-          // extra: col.EXTRA,
-        };
-      });
+          isForeignKey: isFK,
+          foreignKey: fkData,
+        });
+      }
 
-      console.log("Final structure:", structure);
       return structure;
     } catch (error) {
       console.error("Error in structure operation:", error);
       throw error;
     }
+  }
+
+  private static async getForeignKeyDetails(
+    refTable: string,
+    refColumn: string,
+    pkValue?: string | number
+  ) {
+    const refColsQuery = `
+    SELECT COLUMN_NAME
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+    ORDER BY ORDINAL_POSITION
+    LIMIT 2
+  `;
+
+    const [refCols] = (await db.execute(refColsQuery, [refTable])) as [
+      Array<any>,
+      any
+    ];
+    if (refCols.length < 2) return null;
+
+    const [pkCol, secondCol] = refCols.map((r) => r.COLUMN_NAME);
+
+    let rowsQuery: string;
+    let rowsParams: Array<string | number>;
+
+    if (typeof pkValue !== "undefined" && pkValue !== null) {
+      rowsQuery = `SELECT \`${pkCol}\` AS pk, \`${secondCol}\` AS col2 FROM \`${refTable}\` WHERE \`${pkCol}\` = ? LIMIT 1`;
+      rowsParams = [pkValue];
+    } else {
+      rowsQuery = `SELECT \`${pkCol}\` AS pk, \`${secondCol}\` AS col2 FROM \`${refTable}\``;
+      rowsParams = [];
+    }
+
+    const [fkRows] = (await db.execute(rowsQuery, rowsParams)) as [
+      Array<any>,
+      any
+    ];
+
+    return {
+      referencedTable: refTable,
+      referencedColumn: refColumn,
+      rows: fkRows,
+    };
   }
 
   static async listTables() {
