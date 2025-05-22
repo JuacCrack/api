@@ -50,7 +50,7 @@ export const CartService = {
   },
 
   updateItemQuantity(id: string, quantity: number): CartItem | null {
-    const index = cartCache.findIndex(item => item.id_product === id);
+    const index = cartCache.findIndex(item => item.id_product == id);
     if (index === -1) return null;
     if (cartCache[index]) {
       cartCache[index].quantity = quantity;
@@ -59,7 +59,7 @@ export const CartService = {
   },
 
   removeItem(id: string): boolean {
-    const index = cartCache.findIndex(item => item.id_product === id);
+    const index = cartCache.findIndex(item => item.id_product == id);
     if (index === -1) return false;
     cartCache.splice(index, 1);
     return true;
@@ -114,9 +114,9 @@ async executeCheckout(): Promise<{ success: boolean; preferenceId?: string; erro
     console.log("Creating Mercado Pago preference with items:", formattedItems);
     const preference = await mercadoPago.createPreference(formattedItems, {
         back_urls: {
-            success: "https://www.google.com?checkout=1",
-            failure: "https://www.google.com?checkout=0",
-            pending: "https://www.google.com?checkout=2"
+            success: "https://juaccrack.github.io/ShopV1/public/shopping-cart.html?checkout=1",
+            failure: "https://juaccrack.github.io/ShopV1/public/shopping-cart.html?checkout=0",
+            pending: "https://juaccrack.github.io/ShopV1/public/shopping-cart.html?checkout=2"
         },
         auto_return: "approved"
     }).catch(err => {

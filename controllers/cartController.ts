@@ -23,7 +23,7 @@ export class cartController {
   }
 
   async updateItemQuantity(c: Context): Promise<Response> {
-    const itemId = c.req.param("itemId");
+    const itemId = c.req.param("id");
     const quantity = parseInt(c.req.param("quantity"), 10);
 
     if (!itemId || isNaN(quantity) || quantity < 0) {
